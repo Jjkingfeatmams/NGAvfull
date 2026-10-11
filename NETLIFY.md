@@ -115,6 +115,10 @@ Le formulaire de ce test est fixé directement dans
 redirige jamais les réponses vers un autre formulaire. Pour le remplacer un
 jour, mets à jour à la fois son endpoint `formResponse`, les identifiants
 `entry.*` et les libellés de choix dans ce fichier, puis redéploie la Function.
+La réponse HTTP contient aussi l’en-tête
+`x-never-go-alone-function-version` : après publication, il doit indiquer
+`survey-google-form-v6`. Cela confirme que Netlify a bien mis à jour le code
+serveur, et pas uniquement la page HTML.
 
 Le Google Form dédié fourni à cette version contient les quatre choix suivants
 pour la formule :

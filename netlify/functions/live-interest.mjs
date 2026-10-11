@@ -17,7 +17,11 @@ const GENDERS = new Set(["woman", "man", "unspecified"]);
 // the owner selected this precise form for the live test. An older Netlify
 // environment value must never silently redirect new answers to another form.
 const CONTACT_SURVEY_FORM_RESPONSE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf51Y4uCxD4KDSdK-lxJmK4ZQREWskSfsKgjGDiHo4wDOexQw/formResponse";
-const CONTACT_SURVEY_FORM_VERSION = "dedicated-pricing-v5";
+// Bump this whenever the Google Forms delivery logic changes. Existing
+// consented profiles can then retry once instead of being treated as sent by
+// an earlier, incompatible Function deployment.
+const CONTACT_SURVEY_FORM_VERSION = "dedicated-pricing-v6";
+const FUNCTION_VERSION = "survey-google-form-v6";
 const ANONYMOUS_DECLINE_FORM_VERSION = "dedicated-decline-v3";
 const ANONYMOUS_DECLINE_NOTE = "Réponse anonyme — parcours arrêté après la question d’intérêt.";
 const SITUATION_TARGETS = new Map([
@@ -77,7 +81,10 @@ function json(data, status = 200) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      "x-robots-tag": "noindex, nofollow"
+      "x-robots-tag": "noindex, nofollow",
+      // Makes a stale Netlify Function immediately diagnosable without
+      // exposing survey data or any secret configuration.
+      "x-never-go-alone-function-version": FUNCTION_VERSION
     }
   });
 }
@@ -424,7 +431,12 @@ async function saveSurveySession(request) {
   const store = interestStore();
   const key = surveyKey(sessionId);
   const existing = await store.get(key, { type: "json" });
-  if (existing && (!validSurveyRecord(existing) || existing.eventId !== eventId)) {
+  // A previous Function version may have written an earlier survey shape for
+  // the same random session.  It must not trap that visitor on step 2 with a
+  // 409: rebuild the record below from the current, non-personal payload.
+  // Only a *valid* session already associated with another event is a real
+  // conflict.
+  if (existing && validSurveyRecord(existing) && existing.eventId !== eventId) {
     throw new HttpError(409, "Cette session de sondage ne peut pas être réutilisée.", "survey-session-conflict");
   }
 
